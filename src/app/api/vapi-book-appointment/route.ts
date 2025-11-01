@@ -4,34 +4,6 @@ import { getAvailableDoctors } from "@/lib/actions/doctors";
 import { getBookedTimeSlots, bookAppointment } from "@/lib/actions/appointments";
 import { APPOINTMENT_TYPES, getAvailableTimeSlots } from "@/lib/utils";
 
-// CORS headers helper
-function getCorsHeaders(origin?: string | null) {
-  // Allowed origins
-  const allowedOrigins = [
-    "https://dentify37.vercel.app",
-    "https://www.dentify37.vercel.app",
-    "http://localhost:3000",
-    "http://localhost:3001",
-  ];
-
-  // Determine the origin to allow
-  const allowedOrigin =
-    origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
-
-  return {
-    "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    "Access-Control-Allow-Credentials": "true",
-  };
-}
-
-// Handle OPTIONS preflight requests
-export async function OPTIONS(request: NextRequest) {
-  const origin = request.headers.get("origin");
-  return NextResponse.json({}, { headers: getCorsHeaders(origin) });
-}
-
 // VAPI tool call format handler
 export async function POST(request: NextRequest) {
   try {
@@ -44,10 +16,9 @@ export async function POST(request: NextRequest) {
       const results = [];
 
       for (const toolCall of toolCalls) {
-        // Handle both formats: direct name/arguments or function.name/function.arguments
         const toolCallId = toolCall.id;
-        const functionName = toolCall.function?.name || toolCall.name;
-        const args = toolCall.function?.arguments || toolCall.arguments || {};
+        const functionName = toolCall.function?.name;
+        const args = toolCall.function?.arguments || {};
         
         if (functionName === "book_appointment") {
           // Extract clerkId from multiple possible sources:
@@ -82,36 +53,34 @@ export async function POST(request: NextRequest) {
             toolCallId,
             result: `Available doctors: ${doctorList}`,
           });
+        } else if (functionName === "get_available_times") {
+          // Handle getting available appointment times for a doctor and date
+          const result = await handleGetAvailableTimes({
+            doctorId: args.doctorId,
+            doctorName: args.doctorName,
+            date: args.date,
+          });
+          results.push({
+            toolCallId,
+            result: result,
+          });
         }
       }
 
-      const origin = request.headers.get("origin");
-      return NextResponse.json({ results }, { headers: getCorsHeaders(origin) });
+      return NextResponse.json({ results });
     }
 
-    // Fallback: Handle direct API call format (for testing)
-    const { doctorId, doctorName, date, time, appointmentType, reason, clerkId } = body;
-    const origin = request.headers.get("origin");
-
-    const result = await handleBooking({
-      doctorId,
-      doctorName,
-      date,
-      time,
-      appointmentType,
-      reason,
-      clerkId,
-    }, request);
-
-    return NextResponse.json({ message: result }, { headers: getCorsHeaders(origin) });
+    return NextResponse.json(
+      { error: "Invalid request format" },
+      { status: 400 }
+    );
   } catch (error: any) {
     console.error("Error in VAPI book appointment:", error);
-    const origin = request.headers.get("origin");
     return NextResponse.json(
       {
         error: error.message || "Failed to book appointment",
       },
-      { status: 500, headers: getCorsHeaders(origin) }
+      { status: 500 }
     );
   }
 }
@@ -261,6 +230,82 @@ async function handleBooking(
   } catch (error: any) {
     console.error("Error in handleBooking:", error);
     return `I encountered an error while booking your appointment: ${error.message}. Please try again or contact support if the issue persists.`;
+  }
+}
+
+// Helper function to get available appointment times
+async function handleGetAvailableTimes({
+  doctorId,
+  doctorName,
+  date,
+}: {
+  doctorId?: string;
+  doctorName?: string;
+  date?: string;
+}): Promise<string> {
+  try {
+    // Validate date is provided
+    if (!date) {
+      return "I need a date to check available appointment times. Please provide a date in YYYY-MM-DD format.";
+    }
+
+    // Validate date format
+    const appointmentDate = new Date(date);
+    if (isNaN(appointmentDate.getTime())) {
+      return "Invalid date format. Please provide the date in YYYY-MM-DD format, for example 2025-01-15.";
+    }
+
+    // Resolve doctor ID if only doctor name is provided
+    let resolvedDoctorId = doctorId;
+    if (!doctorId && doctorName) {
+      const doctors = await getAvailableDoctors();
+      const doctor = doctors.find(
+        (d) => d.name.toLowerCase() === doctorName.toLowerCase()
+      );
+      if (!doctor) {
+        const doctorList = doctors.map((d) => `${d.name} (${d.speciality})`).join(", ");
+        return `I couldn't find a doctor named "${doctorName}". Available doctors are: ${doctorList}.`;
+      }
+      resolvedDoctorId = doctor.id;
+    }
+
+    if (!resolvedDoctorId) {
+      const doctors = await getAvailableDoctors();
+      const doctorList = doctors.map((d) => `${d.name} (${d.speciality})`).join(", ");
+      return `Please specify which doctor you'd like to check availability for. Available doctors are: ${doctorList}`;
+    }
+
+    // Get all available time slots and booked time slots
+    const allTimeSlots = getAvailableTimeSlots();
+    const bookedSlots = await getBookedTimeSlots(resolvedDoctorId, date);
+
+    // Filter out booked slots
+    const availableSlots = allTimeSlots.filter((slot) => !bookedSlots.includes(slot));
+
+    if (availableSlots.length === 0) {
+      return `Unfortunately, there are no available appointment times for ${new Date(date).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}. Would you like to check a different date?`;
+    }
+
+    // Format times for display (e.g., "9:00 AM", "2:30 PM")
+    const formattedTimes = availableSlots.map((time) => {
+      const timeDate = new Date(`2000-01-01T${time}`);
+      return timeDate.toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      });
+    });
+
+    const formattedDate = appointmentDate.toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+    });
+
+    return `Available appointment times on ${formattedDate} are: ${formattedTimes.join(", ")}. Which time would you prefer?`;
+  } catch (error: any) {
+    console.error("Error in handleGetAvailableTimes:", error);
+    return `I encountered an error while checking available times: ${error.message}. Please try again.`;
   }
 }
 
