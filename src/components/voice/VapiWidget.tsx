@@ -26,14 +26,6 @@ function VapiWidget() {
 
   // setup event listeners for VAPI
   useEffect(() => {
-    // Set up tool call handler to inject clerkId
-    const handleToolCall = async (toolCall: any) => {
-      // If this is a booking tool call, inject clerkId if available
-      if (toolCall.name === "book_appointment" && user?.id && toolCall.arguments) {
-        toolCall.arguments.clerkId = user.id;
-      }
-    };
-
     const handleCallStart = () => {
       console.log("Call started");
       setConnecting(false);
@@ -103,9 +95,34 @@ function VapiWidget() {
         setMessages([]);
         setCallEnded(false);
 
-        // Pass user context to VAPI - VAPI will include this in tool calls via call.variables
-        // Note: This needs to be configured in VAPI assistant settings as a variable
-        await vapi.start(process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID);
+        // Pass user context (clerkId) and current date to VAPI via call variables
+        // This will be available in the backend as body.call?.variables?.clerkId
+        const now = new Date();
+        const todayISO = now.toISOString().split('T')[0]; // YYYY-MM-DD format
+        const todayFormatted = now.toLocaleDateString('en-US', { 
+          weekday: 'long', 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        });
+        
+        const callConfig: any = {
+          assistantId: process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID,
+        };
+        
+        // Pass clerkId and current date as variables
+        callConfig.variables = {
+          currentDate: todayISO,
+          currentDateFormatted: todayFormatted,
+          currentYear: now.getFullYear().toString(),
+        };
+        
+        // If user is logged in, add clerkId
+        if (user?.id) {
+          callConfig.variables.clerkId = user.id;
+        }
+        
+        await vapi.start(callConfig);
       } catch (error) {
         console.log("Failed to start call", error);
         setConnecting(false);

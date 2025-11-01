@@ -20,6 +20,7 @@ export async function POST(request: NextRequest) {
         const functionName = toolCall.function?.name;
         const args = toolCall.function?.arguments || {};
         
+        // Support both singular and plural function names for backward compatibility
         if (functionName === "book_appointment") {
           // Extract clerkId from multiple possible sources:
           // 1. Direct argument from tool call
@@ -115,11 +116,17 @@ async function handleBooking(
     // If clerkId is provided, use it to find the user
     let userId = null;
     if (clerkId) {
+      // Basic validation: Clerk IDs should not contain spaces (which would indicate it's a name)
+      // If it looks like a name instead of an ID, provide helpful error
+      if (clerkId.includes(" ")) {
+        return "I couldn't find your account. The user ID appears to be invalid (looks like a name instead of an ID). Please make sure you're properly logged in and try again.";
+      }
+      
       const user = await prisma.user.findUnique({
         where: { clerkId },
       });
       if (!user) {
-        return "I couldn't find your account. Please make sure you're logged in to book an appointment.";
+        return "I couldn't find your account. Please make sure you're logged in to book an appointment. If you just signed up, your account might need a moment to sync.";
       }
       userId = user.id;
     } else {
@@ -153,11 +160,23 @@ async function handleBooking(
       return "Invalid date format. Please provide the date in YYYY-MM-DD format, for example 2025-01-15.";
     }
 
+    // Check if date is in the past (likely a year issue)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    appointmentDate.setHours(0, 0, 0, 0);
+    
+    // If the date is clearly in the past (e.g., 2023 or earlier), suggest updating the year
+    if (appointmentDate.getFullYear() < 2025) {
+      // Extract month and day from the original date
+      const monthDay = date.split("-").slice(1).join("-");
+      const suggestedDate = `2025-${monthDay}`;
+      return `That date appears to be in the past (${date}). The current year is 2025. Would you like to book for ${suggestedDate} instead? Or please provide a date in 2025 or later.`;
+    }
+
     // Check if the date is in the future (at least tomorrow)
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     tomorrow.setHours(0, 0, 0, 0);
-    appointmentDate.setHours(0, 0, 0, 0);
     if (appointmentDate < tomorrow) {
       const next5Days = getNext5Days().map(d => new Date(d).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })).join(", ");
       return `Appointments must be booked at least one day in advance. Available dates are: ${next5Days}. Which date would you prefer?`;
