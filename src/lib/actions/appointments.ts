@@ -38,15 +38,22 @@ export async function getAppointments() {
   }
 }
 
-export async function getUserAppointments() {
+export async function getUserAppointments(userId?: string) {
   try {
-    // get authenticated user from Clerk
-    const { userId } = await auth();
-    if (!userId) throw new Error("You must be logged in to view appointments");
+    // If userId is provided directly (e.g., from VAPI), use it; otherwise get from Clerk auth
+    let user;
+    if (userId) {
+      user = await prisma.user.findUnique({ where: { id: userId } });
+      if (!user) throw new Error("User not found. Please ensure your account is properly set up.");
+    } else {
+      // get authenticated user from Clerk
+      const { userId: clerkUserId } = await auth();
+      if (!clerkUserId) throw new Error("You must be logged in to view appointments");
 
-    // find user by clerkId from authenticated session
-    const user = await prisma.user.findUnique({ where: { clerkId: userId } });
-    if (!user) throw new Error("User not found. Please ensure your account is properly set up.");
+      // find user by clerkId from authenticated session
+      user = await prisma.user.findUnique({ where: { clerkId: clerkUserId } });
+      if (!user) throw new Error("User not found. Please ensure your account is properly set up.");
+    }
 
     const appointments = await prisma.appointment.findMany({
       where: { userId: user.id },

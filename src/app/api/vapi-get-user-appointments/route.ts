@@ -1,31 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getUserAppointments } from "@/lib/actions/appointments";
 
-// Helper function to get user appointments
+// Helper function to get user appointments and format for VAPI
 async function handleGetUserAppointments(clerkId?: string): Promise<string> {
   try {
     if (!clerkId) {
       return "I need to verify your account to view your appointments. Please make sure you're logged in.";
     }
 
-    // Find user by clerkId
+    // Find user by clerkId to get the database userId
     const user = await prisma.user.findUnique({
       where: { clerkId },
+      select: { id: true },
     });
 
     if (!user) {
       return "I couldn't find your account. Please make sure you're logged in.";
     }
 
-    // Get user appointments
-    const appointments = await prisma.appointment.findMany({
-      where: { userId: user.id },
-      include: {
-        user: { select: { firstName: true, lastName: true, email: true } },
-        doctor: { select: { name: true, imageUrl: true } },
-      },
-      orderBy: [{ date: "asc" }, { time: "asc" }],
-    });
+    // Use the server action to get appointments
+    const appointments = await getUserAppointments(user.id);
 
     if (appointments.length === 0) {
       return "You don't have any upcoming appointments scheduled. Would you like to book one?";
@@ -68,7 +63,7 @@ async function handleGetUserAppointments(clerkId?: string): Promise<string> {
         hour12: true,
       });
 
-      return `- ${appt.doctor.name} on ${formattedDate} at ${formattedTime} for ${appt.reason || "General consultation"}`;
+      return `- ${appt.doctorName} on ${formattedDate} at ${formattedTime} for ${appt.reason || "General consultation"}`;
     });
 
     let response = `You have ${upcomingAppointments.length} upcoming appointment${upcomingAppointments.length === 1 ? "" : "s"}: ${formattedAppointments.join(". ")}.`;
