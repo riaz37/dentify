@@ -1,0 +1,25 @@
+{
+  "message": {
+    "type": "tool-calls",
+    "toolCallList": [
+      {
+        "id": "test_tool_call_123",
+        "name": "book_appointment",
+        "arguments": {
+          "doctorName": "Dr. Smith",
+          "date": "2025-01-20",
+          "time": "14:30",
+          "appointmentType": "checkup",
+          "clerkId": "user_test123"
+        }
+      }
+    ]
+  },
+  "call": {
+    "id": "test_call_123",
+    "variables": {
+      "clerkId": "user_test123"
+    }
+  }
+}
+
