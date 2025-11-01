@@ -4,6 +4,34 @@ import { getAvailableDoctors } from "@/lib/actions/doctors";
 import { getBookedTimeSlots, bookAppointment } from "@/lib/actions/appointments";
 import { APPOINTMENT_TYPES, getAvailableTimeSlots } from "@/lib/utils";
 
+// CORS headers helper
+function getCorsHeaders(origin?: string | null) {
+  // Allowed origins
+  const allowedOrigins = [
+    "https://dentify37.vercel.app",
+    "https://www.dentify37.vercel.app",
+    "http://localhost:3000",
+    "http://localhost:3001",
+  ];
+
+  // Determine the origin to allow
+  const allowedOrigin =
+    origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Allow-Credentials": "true",
+  };
+}
+
+// Handle OPTIONS preflight requests
+export async function OPTIONS(request: NextRequest) {
+  const origin = request.headers.get("origin");
+  return NextResponse.json({}, { headers: getCorsHeaders(origin) });
+}
+
 // VAPI tool call format handler
 export async function POST(request: NextRequest) {
   try {
@@ -54,11 +82,13 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      return NextResponse.json({ results });
+      const origin = request.headers.get("origin");
+      return NextResponse.json({ results }, { headers: getCorsHeaders(origin) });
     }
 
     // Fallback: Handle direct API call format (for testing)
     const { doctorId, doctorName, date, time, appointmentType, reason, clerkId } = body;
+    const origin = request.headers.get("origin");
 
     const result = await handleBooking({
       doctorId,
@@ -70,14 +100,15 @@ export async function POST(request: NextRequest) {
       clerkId,
     }, request);
 
-    return NextResponse.json({ message: result });
+    return NextResponse.json({ message: result }, { headers: getCorsHeaders(origin) });
   } catch (error: any) {
     console.error("Error in VAPI book appointment:", error);
+    const origin = request.headers.get("origin");
     return NextResponse.json(
       {
         error: error.message || "Failed to book appointment",
       },
-      { status: 500 }
+      { status: 500, headers: getCorsHeaders(origin) }
     );
   }
 }
