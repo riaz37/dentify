@@ -72,9 +72,23 @@ export async function POST(request: NextRequest) {
       const results = [];
 
       for (const toolCall of toolCalls) {
-        const { id: toolCallId, name } = toolCall;
+        // Handle both formats: direct name or function.name
+        const toolCallId = toolCall.id;
+        const functionName = toolCall.function?.name || toolCall.name;
         
-        if (name === "get_available_doctors") {
+        // Debug logging
+        console.log("Processing tool call:", {
+          toolCallId,
+          functionName,
+          toolCallStructure: {
+            hasFunction: !!toolCall.function,
+            hasName: !!toolCall.name,
+            functionName: toolCall.function?.name,
+            directName: toolCall.name,
+          },
+        });
+        
+        if (functionName === "get_available_doctors") {
           const doctors = await getAvailableDoctors();
           const doctorList = doctors
             .map((d) => `${d.name} (${d.speciality})`)
@@ -84,6 +98,8 @@ export async function POST(request: NextRequest) {
             toolCallId,
             result: `Available doctors: ${doctorList}. Which doctor would you like to book with?`,
           });
+        } else {
+          console.log(`Tool name "${functionName}" does not match "get_available_doctors"`);
         }
       }
 

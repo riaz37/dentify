@@ -44,9 +44,12 @@ export async function POST(request: NextRequest) {
       const results = [];
 
       for (const toolCall of toolCalls) {
-        const { id: toolCallId, name, arguments: args } = toolCall;
+        // Handle both formats: direct name/arguments or function.name/function.arguments
+        const toolCallId = toolCall.id;
+        const functionName = toolCall.function?.name || toolCall.name;
+        const args = toolCall.function?.arguments || toolCall.arguments || {};
         
-        if (name === "book_appointment") {
+        if (functionName === "book_appointment") {
           // Extract clerkId from multiple possible sources:
           // 1. Direct argument from tool call
           // 2. Call variables (if set in VAPI)
@@ -71,7 +74,7 @@ export async function POST(request: NextRequest) {
             toolCallId,
             result: result,
           });
-        } else if (name === "get_available_doctors") {
+        } else if (functionName === "get_available_doctors") {
           // Handle getting available doctors
           const doctors = await getAvailableDoctors();
           const doctorList = doctors.map((d) => `${d.name} (${d.speciality})`).join(", ");
