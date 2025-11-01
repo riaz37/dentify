@@ -185,6 +185,7 @@ async function handleBooking(
       date,
       time,
       reason: appointmentTypeObj?.name || reason || "General consultation",
+      userId: userId, // Pass userId for VAPI calls (bypasses Clerk auth)
     });
 
     // Send confirmation email

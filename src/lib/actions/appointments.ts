@@ -121,19 +121,26 @@ interface BookAppointmentInput {
   date: string;
   time: string;
   reason?: string;
+  userId?: string; // Optional: for VAPI calls that provide userId directly
 }
 
 export async function bookAppointment(input: BookAppointmentInput) {
   try {
-    const { userId } = await auth();
-    if (!userId) throw new Error("You must be logged in to book an appointment");
+    // If userId is provided directly (e.g., from VAPI), use it; otherwise get from Clerk auth
+    let user;
+    if (input.userId) {
+      user = await prisma.user.findUnique({ where: { id: input.userId } });
+      if (!user) throw new Error("User not found. Please ensure your account is properly set up.");
+    } else {
+      const { userId } = await auth();
+      if (!userId) throw new Error("You must be logged in to book an appointment");
+      user = await prisma.user.findUnique({ where: { clerkId: userId } });
+      if (!user) throw new Error("User not found. Please ensure your account is properly set up.");
+    }
 
     if (!input.doctorId || !input.date || !input.time) {
       throw new Error("Doctor, date, and time are required");
     }
-
-    const user = await prisma.user.findUnique({ where: { clerkId: userId } });
-    if (!user) throw new Error("User not found. Please ensure your account is properly set up.");
 
     const appointment = await prisma.appointment.create({
       data: {
