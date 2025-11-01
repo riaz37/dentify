@@ -1,6 +1,7 @@
 import AppointmentConfirmationEmail from "@/components/emails/AppointmentConfirmationEmail";
 import transporter from "@/lib/nodemailer";
 import { render } from "@react-email/render";
+import type nodemailer from "nodemailer";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
@@ -23,7 +24,7 @@ export async function POST(request: Request) {
     }
 
     // Render React email component to HTML
-    const emailHtml = render(
+    const emailHtml: string = await render(
       AppointmentConfirmationEmail({
         doctorName,
         appointmentDate,
@@ -35,7 +36,7 @@ export async function POST(request: Request) {
     );
 
     // Send the email using nodemailer
-    const mailOptions = {
+    const mailOptions: nodemailer.SendMailOptions = {
       from: process.env.SMTP_FROM || `Dentify <${process.env.SMTP_USER}>`,
       to: userEmail,
       subject: "Appointment Confirmation - Dentify",

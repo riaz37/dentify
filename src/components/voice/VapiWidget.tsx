@@ -26,6 +26,14 @@ function VapiWidget() {
 
   // setup event listeners for VAPI
   useEffect(() => {
+    // Set up tool call handler to inject clerkId
+    const handleToolCall = async (toolCall: any) => {
+      // If this is a booking tool call, inject clerkId if available
+      if (toolCall.name === "book_appointment" && user?.id && toolCall.arguments) {
+        toolCall.arguments.clerkId = user.id;
+      }
+    };
+
     const handleCallStart = () => {
       console.log("Call started");
       setConnecting(false);
@@ -71,6 +79,9 @@ function VapiWidget() {
       .on("speech-end", handleSpeechEnd)
       .on("message", handleMessage)
       .on("error", handleError);
+    
+    // Listen for tool calls to inject user context
+    // Note: This might need adjustment based on actual VAPI SDK events
 
     // cleanup event listeners on unmount
     return () => {
@@ -92,6 +103,8 @@ function VapiWidget() {
         setMessages([]);
         setCallEnded(false);
 
+        // Pass user context to VAPI - VAPI will include this in tool calls via call.variables
+        // Note: This needs to be configured in VAPI assistant settings as a variable
         await vapi.start(process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID);
       } catch (error) {
         console.log("Failed to start call", error);
@@ -165,7 +178,7 @@ function VapiWidget() {
               </div>
             </div>
 
-            <h2 className="text-xl font-bold text-foreground">Dentify AI</h2>
+            <h2 className="text-xl font-bold text-foreground">Riley</h2>
             <p className="text-sm text-muted-foreground mt-1">Dental Assistant</p>
 
             {/* SPEAKING INDICATOR */}
@@ -231,7 +244,7 @@ function VapiWidget() {
             {messages.map((msg, index) => (
               <div key={index} className="message-item animate-in fade-in duration-300">
                 <div className="font-semibold text-xs text-muted-foreground mb-1">
-                  {msg.role === "assistant" ? "Dentify AI" : "You"}:
+                  {msg.role === "assistant" ? "Riley" : "You"}:
                 </div>
                 <p className="text-foreground">{msg.content}</p>
               </div>

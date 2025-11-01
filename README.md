@@ -1,6 +1,6 @@
 <h1 align="center">🦷 Dentify – Dental Platform with AI Voice Agent 🦷</h1>
 
-![Demo App](/public/screenshot-for-readme.png)
+
 
 Highlights:
 
