@@ -42,7 +42,7 @@ export function useBookAppointment() {
 export function useUserAppointments() {
   const result = useQuery({
     queryKey: ["getUserAppointments"],
-    queryFn: getUserAppointments,
+    queryFn: () => getUserAppointments(),
   });
 
   return result;
