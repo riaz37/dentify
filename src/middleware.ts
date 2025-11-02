@@ -1,6 +1,7 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
 const isPublicRoute = createRouteMatcher([
+  "/", // Landing page - public
   "/api/vapi-get-user-appointments",
   "/api/vapi-book-appointment",
   "/api/vapi-get-doctors",
